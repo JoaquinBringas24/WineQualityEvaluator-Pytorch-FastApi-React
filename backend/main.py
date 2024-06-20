@@ -1,9 +1,11 @@
-from fastapi import FastAPI, Form
-from .ml.model.model_template import PredictionModel
+from fastapi import FastAPI, Form, status
+from ml.model.model_template import PredictionModel
 from pydantic import BaseModel, Field
 import numpy as np
 from torch import load, tensor, float32
 from typing import Annotated
+import uvicorn
+from fastapi.middleware.cors import CORSMiddleware
 
 class Input(BaseModel):
     fixed_acidity: float = Field()
@@ -24,36 +26,36 @@ model.load_state_dict(load("./ml/model/trained_model.pth"))
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:8000/"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
+
 @app.get("/")
 def root():
     return {"Working!"}
 
-@app.post("/api/predict")
-async def predict(fixed_acidity: Annotated[float, Form()],
-    volatile_acidity: Annotated[float, Form()],
-    citric_acid: Annotated[float, Form()],
-    residual_sugar: Annotated[float, Form()],
-    chlorides: Annotated[float, Form()],
-    free_sulfur_dioxide: Annotated[float, Form()],
-    total_sulfur_dioxide: Annotated[float, Form()],
-    density: Annotated[float, Form()],
-    pH: Annotated[float, Form()],
-    sulphates: Annotated[float, Form()],
-    alcohol: Annotated[float, Form()],):
+@app.post("/api/predict", status_code=status.HTTP_200_OK)
+async def predict(request: Input):
     
-    x = tensor([fixed_acidity,
-             volatile_acidity,
-             citric_acid,
-             residual_sugar,
-             chlorides,
-             free_sulfur_dioxide,
-             total_sulfur_dioxide,
-             density,
-             pH,
-             sulphates,
-             alcohol],
+    x = tensor([request.fixed_acidity,
+             request.volatile_acidity,
+             request.citric_acid,
+             request.residual_sugar,
+             request.chlorides,
+             request.free_sulfur_dioxide,
+             request.total_sulfur_dioxide,
+             request.density,
+             request.pH,
+             request.sulphates,
+             request.alcohol],
              dtype=float32)
     
     pred = model(x)
     return {pred.item()} 
 
+if __name__ == "__main__":
+    uvicorn.run(app, host="localhost", port=3000)
